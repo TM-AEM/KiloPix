@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TextAppearance.KiloPix.AppName" parent="@android:style/TextAppearance.Material.Headline">
+        <item name="android:textSize">@dimen/text_app_name</item>
+        <item name="android:textColor">@color/on_surface</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.KiloPix.SectionTitle" parent="@android:style/TextAppearance.Material.Caption">
+        <item name="android:textSize">@dimen/text_section_title</item>
+        <item name="android:textColor">@color/on_surface_variant</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <style name="TextAppearance.KiloPix.Body" parent="@android:style/TextAppearance.Material.Body1">
+        <item name="android:textSize">@dimen/text_body</item>
+        <item name="android:textColor">@color/on_surface_variant</item>
+    </style>
+
+    <style name="TextAppearance.KiloPix.Label" parent="@android:style/TextAppearance.Material.Body1">
+        <item name="android:textSize">@dimen/text_label</item>
+        <item name="android:textColor">@color/on_surface</item>
+    </style>
+
+    <style name="TextAppearance.KiloPix.Helper" parent="@android:style/TextAppearance.Material.Caption">
+        <item name="android:textSize">@dimen/text_helper</item>
+        <item name="android:textColor">@color/on_surface_variant</item>
+    </style>
+
+    <style name="Widget.KiloPix.Segment" parent="@android:style/Widget.Material.CompoundButton.RadioButton">
+        <item name="android:button">@null</item>
+        <item name="android:background">@drawable/segment_background</item>
+        <item name="android:textColor">@color/segment_text</item>
+        <item name="android:textSize">@dimen/text_label</item>
+        <item name="android:gravity">center</item>
+        <item name="android:minHeight">@dimen/touch_target_min</item>
+        <item name="android:paddingStart">@dimen/space_3</item>
+        <item name="android:paddingEnd">@dimen/space_3</item>
+        <item name="android:paddingTop">@dimen/space_2</item>
+        <item name="android:paddingBottom">@dimen/space_2</item>
+    </style>
+
+    <style name="Widget.KiloPix.SecondaryButton" parent="@android:style/Widget.Material.Button.Borderless">
+        <item name="android:minHeight">@dimen/touch_target_min</item>
+        <item name="android:textColor">@color/on_surface_variant</item>
+        <item name="android:textSize">@dimen/text_label</item>
+    </style>
+</resources>

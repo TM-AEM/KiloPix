@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="space_1">4dp</dimen>
+    <dimen name="space_2">8dp</dimen>
+    <dimen name="space_3">12dp</dimen>
+    <dimen name="space_4">16dp</dimen>
+    <dimen name="space_5">24dp</dimen>
+    <dimen name="space_6">32dp</dimen>
+
+    <dimen name="screen_padding_h">16dp</dimen>
+    <dimen name="content_top_padding">16dp</dimen>
+    <dimen name="content_bottom_padding">24dp</dimen>
+
+    <dimen name="corner_card">16dp</dimen>
+    <dimen name="corner_segment">12dp</dimen>
+    <dimen name="card_padding">16dp</dimen>
+
+    <dimen name="primary_action_min_height">128dp</dimen>
+    <dimen name="primary_action_icon">40dp</dimen>
+    <dimen name="touch_target_min">48dp</dimen>
+
+    <dimen name="text_app_name">24sp</dimen>
+    <dimen name="text_section_title">13sp</dimen>
+    <dimen name="text_body">15sp</dimen>
+    <dimen name="text_action">18sp</dimen>
+    <dimen name="text_label">15sp</dimen>
+    <dimen name="text_helper">13sp</dimen>
+</resources>

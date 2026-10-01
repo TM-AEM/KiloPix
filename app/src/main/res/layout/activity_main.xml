@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/screen_padding_h"
+        android:paddingEnd="@dimen/screen_padding_h"
+        android:paddingTop="@dimen/content_top_padding"
+        android:paddingBottom="@dimen/content_bottom_padding">
+
+        <!-- Header -->
+        <TextView
+            android:id="@+id/app_title"
+            style="@style/TextAppearance.KiloPix.AppName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:accessibilityHeading="true"
+            android:text="@string/app_name" />
+
+        <TextView
+            style="@style/TextAppearance.KiloPix.Body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_1"
+            android:text="@string/app_tagline" />
+
+        <!-- Primary action (Task 03 hook: image selection) -->
+        <LinearLayout
+            android:id="@+id/primary_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:background="@drawable/bg_primary_action"
+            android:clickable="true"
+            android:contentDescription="@string/action_choose_images_desc"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:gravity="center"
+            android:minHeight="@dimen/primary_action_min_height"
+            android:orientation="vertical"
+            android:padding="@dimen/card_padding">
+
+            <ImageView
+                android:layout_width="@dimen/primary_action_icon"
+                android:layout_height="@dimen/primary_action_icon"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_add_images"
+                android:tint="@color/on_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_3"
+                android:importantForAccessibility="no"
+                android:text="@string/action_choose_images"
+                android:textColor="@color/on_primary"
+                android:textSize="@dimen/text_action"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_1"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:text="@string/action_choose_images_hint"
+                android:textColor="@color/on_primary_muted"
+                android:textSize="@dimen/text_helper" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/selection_summary"
+            style="@style/TextAppearance.KiloPix.Helper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_3"
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/selection_none" />
+
+        <TextView
+            android:id="@+id/selection_names"
+            style="@style/TextAppearance.KiloPix.Label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_1"
+            android:visibility="gone" />
+
+        <!-- Compression mode -->
+        <TextView
+            style="@style/TextAppearance.KiloPix.SectionTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:accessibilityHeading="true"
+            android:text="@string/section_compression_mode" />
+
+        <RadioGroup
+            android:id="@+id/mode_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
+            android:background="@drawable/bg_segment_group"
+            android:orientation="horizontal"
+            android:padding="@dimen/space_1">
+
+            <RadioButton
+                android:id="@+id/mode_quick"
+                style="@style/Widget.KiloPix.Segment"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:text="@string/mode_quick" />
+
+            <RadioButton
+                android:id="@+id/mode_target"
+                style="@style/Widget.KiloPix.Segment"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/mode_target" />
+
+            <RadioButton
+                android:id="@+id/mode_manual"
+                style="@style/Widget.KiloPix.Segment"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/mode_manual" />
+        </RadioGroup>
+
+        <TextView
+            style="@style/TextAppearance.KiloPix.Helper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
+            android:text="@string/mode_helper" />
+
+        <!-- Options foundation (visual placeholders only) -->
+        <TextView
+            style="@style/TextAppearance.KiloPix.SectionTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:accessibilityHeading="true"
+            android:text="@string/section_options" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="@dimen/card_padding">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/option_format" />
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Helper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/option_not_set" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="@dimen/space_3"
+                android:layout_marginBottom="@dimen/space_3"
+                android:background="@color/outline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/option_quality" />
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Helper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/option_not_set" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="@dimen/space_3"
+                android:layout_marginBottom="@dimen/space_3"
+                android:background="@color/outline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/option_dimensions" />
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Helper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/option_not_set" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="@dimen/space_3"
+                android:layout_marginBottom="@dimen/space_3"
+                android:background="@color/outline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/option_save_location" />
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Helper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/option_not_set" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            style="@style/TextAppearance.KiloPix.Helper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
+            android:text="@string/options_helper" />
+
+        <!-- Secondary actions (intentionally disabled placeholders) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/action_settings"
+                style="@style/Widget.KiloPix.SecondaryButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:enabled="false"
+                android:text="@string/action_settings" />
+
+            <Button
+                android:id="@+id/action_about"
+                style="@style/Widget.KiloPix.SecondaryButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_2"
+                android:enabled="false"
+                android:text="@string/action_about" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
