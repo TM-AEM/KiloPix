@@ -9,6 +9,8 @@ import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
 
@@ -38,6 +40,9 @@ class MainActivity : Activity() {
     /** Task 14: successful output Uris scoped to the most recent save operation. */
     private var currentShareUris: List<Uri> = emptyList()
 
+    /** Task 15: original byte size per source Uri captured when a save starts. */
+    private var sourceSizes: Map<Uri, Long?> = emptyMap()
+
     private lateinit var selectionSummary: TextView
     private lateinit var selectionNames: TextView
     private lateinit var destinationValue: TextView
@@ -46,6 +51,10 @@ class MainActivity : Activity() {
     private lateinit var replaceExistingSwitch: Switch
     private lateinit var actionShare: View
     private lateinit var actionShareAll: View
+
+    /** Task 15: results card container and the list that holds the per-item rows. */
+    private lateinit var resultsContainer: View
+    private lateinit var resultsList: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +68,8 @@ class MainActivity : Activity() {
         replaceExistingSwitch = findViewById(R.id.option_replace_existing)
         actionShare = findViewById(R.id.action_share)
         actionShareAll = findViewById(R.id.action_share_all)
+        resultsContainer = findViewById(R.id.results_container)
+        resultsList = findViewById(R.id.results_list)
 
         actionShare.setOnClickListener { shareFirstOutput() }
         actionShareAll.setOnClickListener { shareAllOutputs() }
@@ -267,6 +278,10 @@ class MainActivity : Activity() {
         currentShareUris = emptyList()
         renderShareActions()
 
+        // Task 15: clear the previous results list; a new save always starts fresh.
+        hideResults()
+        sourceSizes = captureSourceSizes(selectedUris)
+
         saveInProgress = true
         saveStatus.text = getString(R.string.save_in_progress)
         saveStatus.visibility = View.VISIBLE
@@ -285,12 +300,18 @@ class MainActivity : Activity() {
                 metadataPolicy = ExifMetadataHandler.MetadataPolicy.PRESERVE,
                 gpsPolicy = ExifMetadataHandler.ExifGpsPolicy.PRESERVE,
             )
+            val items = buildResultItems(result)
             runOnUiThread {
                 saveInProgress = false
-                saveStatus.text = if (result.failedCount == 0) {
-                    getString(R.string.save_success, result.successCount, total)
-                } else {
-                    getString(R.string.save_failed, result.failedCount, total)
+                saveStatus.text = when {
+                    result.successCount == 0 && result.failedCount == 0 ->
+                        getString(R.string.save_empty)
+                    result.failedCount == 0 ->
+                        getString(R.string.save_success, result.successCount, total)
+                    result.successCount == 0 ->
+                        getString(R.string.save_failed, result.failedCount, total)
+                    else ->
+                        getString(R.string.save_mixed, result.successCount, result.failedCount, total)
                 }
                 saveStatus.visibility = View.VISIBLE
                 // Populate share state only from the current successful outputs.
@@ -299,9 +320,234 @@ class MainActivity : Activity() {
                     .mapNotNull { it.outputUri }
                     .let(ImageShareHelper::unique)
                 renderShareActions()
+                renderResults(items)
             }
         }.start()
     }
+
+    /**
+     * Task 15: captures the original byte size of each source via the metadata column
+     * [OpenableColumns.SIZE] (no decode). Sizes are looked up by source Uri and paired
+     * per item when rendering. Providers that expose no size yield null (savings hidden).
+     */
+    private fun captureSourceSizes(uris: List<Uri>): Map<Uri, Long?> {
+        val resolver = applicationContext.contentResolver
+        val dest = LinkedHashMap<Uri, Long?>(uris.size)
+        for (uri in uris) {
+            dest[uri] = querySize(resolver, uri)
+        }
+        return dest
+    }
+
+    private fun querySize(resolver: android.content.ContentResolver, uri: Uri): Long? {
+        return try {
+            resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+                ?.use { cursor: Cursor ->
+                    val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) {
+                        cursor.getLong(index)
+                    } else {
+                        null
+                    }
+                }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Task 15: derives the UI-layer per-item results from the ordered batch outcome,
+     * pairing each item with its (possibly null) original size and display names.
+     */
+    private fun buildResultItems(result: BatchCompressionResult): List<ResultItem> =
+        result.itemResults.mapIndexed { index, item ->
+            val sourceName = displayName(item.sourceUri)
+                ?: getString(R.string.selection_name_fallback, index + 1)
+            when (item) {
+                is BatchItemResult.Success -> ResultItem.Success(
+                    sourceUri = item.sourceUri,
+                    sourceName = sourceName,
+                    outputUri = item.outputUri,
+                    outputName = item.outputUri?.let(::displayName),
+                    originalSize = sourceSizesFor(item.sourceUri),
+                    compressedSize = item.bytesWritten,
+                    width = item.width,
+                    height = item.height,
+                    quality = item.quality,
+                )
+
+                is BatchItemResult.Failure -> ResultItem.Failure(
+                    sourceUri = item.sourceUri,
+                    sourceName = sourceName,
+                    reason = item.reason,
+                )
+            }
+        }
+
+    private fun sourceSizesFor(uri: Uri): Long? = sourceSizes[uri]
+
+    /** Clears any previously rendered result rows and hides the results card. */
+    private fun hideResults() {
+        resultsList.removeAllViews()
+        resultsContainer.visibility = View.GONE
+    }
+
+    /** Renders per-item result rows into the results card. */
+    private fun renderResults(items: List<ResultItem>) {
+        if (items.isEmpty()) {
+            hideResults()
+            return
+        }
+
+        resultsList.removeAllViews()
+        for ((index, item) in items.withIndex()) {
+            resultsList.addView(buildResultRow(item))
+            if (index != items.lastIndex) {
+                resultsList.addView(buildDivider())
+            }
+        }
+        resultsContainer.visibility = View.VISIBLE
+    }
+
+    private fun buildResultRow(item: ResultItem): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+
+        // Name takes the available width and truncates; the status label wraps content.
+        val name = headerTextView(
+            text = displayNameFor(item),
+            weight = 1f,
+            color = currentTextColor(),
+        )
+        val statusLabel = headerTextView(
+            text = if (item.isSuccess) {
+                getString(R.string.result_saved)
+            } else {
+                getString(R.string.result_failed)
+            },
+            weight = 0f,
+            color = statusColor(item.isSuccess),
+        )
+        header.addView(name)
+        header.addView(statusLabel)
+
+        val details = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            text = detailText(item)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(helperTextColor())
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+
+        row.addView(header)
+        row.addView(details)
+        return row
+    }
+
+    private fun headerTextView(text: String, weight: Float, color: Int): TextView =
+        TextView(this).apply {
+            val width = if (weight > 0f) 0 else ViewGroup.LayoutParams.WRAP_CONTENT
+            layoutParams = LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT, weight)
+            this.text = text
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextColor(color)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+
+    private fun buildDivider(): View =
+        View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(1),
+            )
+            setBackgroundColor(outlineColor())
+        }
+
+    private fun displayNameFor(item: ResultItem): String =
+        when (item) {
+            is ResultItem.Success -> item.outputName ?: item.sourceName
+            is ResultItem.Failure -> item.sourceName
+        }
+
+    private fun detailText(item: ResultItem): String =
+        when (item) {
+            is ResultItem.Success -> successDetail(item)
+            is ResultItem.Failure -> failureReasonLabel(item.reason)
+        }
+
+    private fun successDetail(item: ResultItem.Success): String {
+        val dimensions = getString(R.string.result_dimensions, item.width, item.height)
+        val quality = getString(R.string.result_quality, item.quality)
+        val savings = savingsDetail(item)
+        return "$dimensions · $quality · $savings"
+    }
+
+    private fun savingsDetail(item: ResultItem.Success): String {
+        val original = item.originalSize
+        if (original == null) return getString(R.string.savings_unknown)
+
+        val originalText = ResultsFormatter.formatBytes(original)
+        val compressedText = ResultsFormatter.formatBytes(item.compressedSize)
+        val saved = ResultsFormatter.bytesSaved(original, item.compressedSize)
+        val grew = ResultsFormatter.bytesGrowth(original, item.compressedSize)
+
+        return when {
+            saved != null -> {
+                val percent = ResultsFormatter.percentageReduction(original, item.compressedSize) ?: 0
+                val savedText = getString(R.string.savings_saved_bytes, ResultsFormatter.formatBytes(saved))
+                val reducedText = getString(R.string.savings_reduced, originalText, compressedText, percent)
+                "$reducedText · $savedText"
+            }
+            grew != null -> {
+                val percent = ResultsFormatter.percentageGrowth(original, item.compressedSize) ?: 0
+                getString(R.string.savings_grew, ResultsFormatter.formatBytes(grew), percent)
+            }
+            else -> "$originalText → $compressedText"
+        }
+    }
+
+    private fun failureReasonLabel(reason: BatchFailureReason): String =
+        when (reason) {
+            BatchFailureReason.DECODE_FAILURE -> getString(R.string.failure_decode)
+            BatchFailureReason.INVALID_REQUEST -> getString(R.string.failure_invalid_request)
+            BatchFailureReason.COMPRESSION_FAILURE -> getString(R.string.failure_compression)
+            BatchFailureReason.OUTPUT_STREAM_FAILURE -> getString(R.string.failure_output_stream)
+            BatchFailureReason.CANCELLATION -> getString(R.string.failure_cancellation)
+            BatchFailureReason.MEMORY_FAILURE -> getString(R.string.failure_memory)
+            BatchFailureReason.UNEXPECTED_FAILURE -> getString(R.string.failure_unexpected)
+        }
+
+    private fun statusColor(success: Boolean): Int =
+        getColor(
+            if (success) android.R.color.holo_green_dark else android.R.color.holo_red_light,
+        )
+
+    private fun currentTextColor(): Int = getColor(R.color.on_surface)
+
+    private fun helperTextColor(): Int = getColor(R.color.on_surface_variant)
+
+    private fun outlineColor(): Int = getColor(R.color.outline)
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     /**
      * Task 14 share visibility. Share actions are only shown after a save completed (not

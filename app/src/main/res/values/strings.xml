@@ -41,9 +41,30 @@
     <string name="save_empty">Select images to compress first</string>
     <string name="save_success">Saved %1$d of %2$d images</string>
     <string name="save_failed">Save failed for %1$d of %2$d images</string>
+    <string name="save_mixed">Saved %1$d of %3$d · %2$d failed</string>
 
     <string name="action_share">Share</string>
     <string name="action_share_all">Share All</string>
     <string name="share_title">Share image</string>
     <string name="share_all_title">Share images</string>
+
+    <!-- Task 15: Results experience -->
+    <string name="results_title">Results</string>
+    <string name="result_saved">Saved</string>
+    <string name="result_failed">Failed</string>
+    <string name="result_dimensions">%1$d × %2$d</string>
+    <string name="result_quality">Quality %1$d</string>
+
+    <string name="savings_unknown">Original size unknown</string>
+    <string name="savings_reduced">%1$s → %2$s (−%3$d%%)</string>
+    <string name="savings_grew">Output larger by %1$s (%2$d%%)</string>
+    <string name="savings_saved_bytes">%1$s saved</string>
+
+    <string name="failure_decode">Could not read this image</string>
+    <string name="failure_invalid_request">The settings were invalid for this image</string>
+    <string name="failure_compression">Compression failed for this image</string>
+    <string name="failure_output_stream">Could not write the output file</string>
+    <string name="failure_cancellation">Operation was cancelled</string>
+    <string name="failure_memory">Not enough memory to process this image</string>
+    <string name="failure_unexpected">Something went wrong</string>
 </resources>
