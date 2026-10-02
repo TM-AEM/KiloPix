@@ -18,6 +18,7 @@
     <string name="option_quality">Quality</string>
     <string name="option_dimensions">Dimensions</string>
     <string name="option_save_location">Save to</string>
+    <string name="option_replace_existing">Replace existing files</string>
     <string name="option_not_set">Not set</string>
     <string name="options_helper">Options become available once images are selected.</string>
 

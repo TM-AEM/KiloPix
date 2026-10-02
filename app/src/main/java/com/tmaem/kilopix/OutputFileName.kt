@@ -30,7 +30,39 @@ object OutputFileName {
     fun baseName(resolver: ContentResolver, sourceUri: Uri): String {
         val display = queryDisplayName(resolver, sourceUri) ?: return DEFAULT_BASE
         val base = display.substringBeforeLast('.').trim()
-        return base.ifEmpty { DEFAULT_BASE }
+        return sanitizeBase(base.ifEmpty { DEFAULT_BASE })
+    }
+
+    /**
+     * Task 13: sanitizes a derived base name so it is safe to use as a content-provider
+     * document / MediaStore display name.
+     *
+     * Removes characters that are unsafe as a provider filename — specifically `/`, `\`,
+     * NUL, all ASCII control characters, and legacy-filesystem-forbidden characters
+     * (`:`, `*`, `?`, `"`, `<`, `>`, `|`). This guarantees, for example, that a source
+     * named `a/b.jpg` never produces an output filename containing `/`.
+     *
+     * Preserved: spaces, dots, parentheses, underscores, hyphens, and normal Unicode
+     * characters (non-ASCII text is not touched).
+     *
+     * Case policy: this performs NO locale-dependent case conversion and the policy is
+     * exactly case-sensitive (`IMAGE.jpg` and `image.jpg` remain distinct output names),
+     * which matches the exact-name replacement matching used elsewhere in Task 13.
+     *
+     * @return the sanitized name, or [DEFAULT_BASE] ("compressed") when nothing remains.
+     */
+    fun sanitizeBase(raw: String): String = buildString {
+        for (ch in raw) {
+            if (!isUnsafeForFilename(ch)) append(ch)
+        }
+        if (isEmpty()) append(DEFAULT_BASE)
+    }
+
+    private fun isUnsafeForFilename(ch: Char): Boolean = when {
+        ch == '/' || ch == '\\' || ch.code == 0 -> true
+        ch.code < 0x20 -> true                      // ASCII control characters
+        ch == ':' || ch == '*' || ch == '?' || ch == '"' || ch == '<' || ch == '>' || ch == '|' -> true
+        else -> false
     }
 
     /** Fully qualified JPEG output name for [base]. */

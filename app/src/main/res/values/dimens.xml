@@ -18,6 +18,7 @@
     <dimen name="primary_action_min_height">128dp</dimen>
     <dimen name="primary_action_icon">40dp</dimen>
     <dimen name="touch_target_min">48dp</dimen>
+    <dimen name="switch_min_height">48dp</dimen>
 
     <dimen name="text_app_name">24sp</dimen>
     <dimen name="text_section_title">13sp</dimen>

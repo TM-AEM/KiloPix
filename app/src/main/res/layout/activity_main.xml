@@ -273,6 +273,35 @@
                     android:textColor="?android:attr/textColorLink"
                     android:visibility="gone" />
             </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="@dimen/space_3"
+                android:layout_marginBottom="@dimen/space_3"
+                android:background="@color/outline" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/TextAppearance.KiloPix.Label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/option_replace_existing" />
+
+                <Switch
+                    android:id="@+id/option_replace_existing"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="false"
+                    android:contentDescription="@string/option_replace_existing"
+                    android:minHeight="@dimen/switch_min_height" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

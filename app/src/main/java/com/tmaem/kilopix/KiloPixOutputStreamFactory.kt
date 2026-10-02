@@ -17,13 +17,17 @@ import java.io.OutputStream
  * For each source Uri it:
  *  1. Decides the active destination: a validated user-selected SAF tree, or the default
  *     MediaStore Downloads destination.
- *  2. Derives a collision-safe output name from the source.
- *  3. Creates a fresh output document and returns a writable [OutputStream] via
- *     [ContentResolver.openOutputStream].
+ *  2. Reads the persisted Task 13 output policy ([OutputPolicyStore]) — [UNIQUE] (default)
+ *     or [REPLACE].
+ *  3. Derives a sanitized, collision-safe output name from the source (UNIQUE), or reuses a
+ *     deterministic sanitized target name and overwrites an existing output in place (REPLACE).
+ *  4. Creates (or, in REPLACE, opens for writing) the output document and returns a writable
+ *     [OutputStream] via [ContentResolver.openOutputStream].
  *
- * It never overwrites the source, never silently overwrites an existing output, and never
- * uses [java.io.File] against a SAF tree or MediaStore destination. All destination I/O is
- * delegated to the framework providers.
+ * It never overwrites the source, never targets arbitrary files outside the configured
+ * KiloPix destination, never silently swallows a replacement, and never uses [java.io.File]
+ * against a SAF tree or MediaStore destination. All destination I/O is delegated to the
+ * framework providers.
  */
 class KiloPixOutputStreamFactory(
     private val context: Context,
@@ -36,18 +40,48 @@ class KiloPixOutputStreamFactory(
 
     override fun open(sourceUri: Uri): OutputStream {
         val tree = OutputDestination.validateCustomTree(context)
-        return if (tree != null) openInTree(tree, sourceUri) else openInMediaStore(sourceUri)
+        val policy = OutputPolicyStore.current(context)
+        return if (tree != null) openInTree(tree, sourceUri, policy) else openInMediaStore(sourceUri, policy)
     }
 
-    /** Creates a child document under the SAF tree and opens a stream to it. */
-    private fun openInTree(tree: Uri, sourceUri: Uri): OutputStream {
+    /**
+     * Opens (SAF tree) the destination stream for [sourceUri] under the selected policy.
+     *
+     * [OutputPolicy.UNIQUE]: exactly the Task 12 behavior — deterministic name with a
+     * numeric de-conflict suffix, never overwriting.
+     *
+     * [OutputPolicy.REPLACE]: deterministic sanitized target name; if a child document in
+     * this tree has the exact same display name, write to it in place (never `(1)`), else
+     * create the document. The existing document is opened for writing first; it is never
+     * deleted before a direct overwrite is attempted.
+     */
+    private fun openInTree(tree: Uri, sourceUri: Uri, policy: OutputPolicy): OutputStream {
         val base = OutputFileName.baseName(resolver, sourceUri)
-        // Collision detection is based on the set of existing child display names returned
-        // by the tree provider. createDocument() is called exactly once for the final name;
-        // it is never used as an existence probe (which would itself create unwanted
-        // documents that are then left behind).
-        val existing = existingChildNames(tree)
-        val name = OutputFileName.collisionSafeName(OutputFileName.jpegName(base), existing::contains)
+        val jpeg = OutputFileName.jpegName(base)
+        return when (policy) {
+            OutputPolicy.UNIQUE -> {
+                // Collision detection is based on the set of existing child display names
+                // returned by the tree provider. createDocument() is called exactly once for
+                // the final name; it is never used as an existence probe (which would itself
+                // create unwanted documents that are then left behind).
+                val existing = existingChildNames(tree)
+                val name = OutputFileName.collisionSafeName(jpeg, existing::contains)
+                createInTree(tree, name)
+            }
+            OutputPolicy.REPLACE -> {
+                val existingDoc = findChildDocument(tree, jpeg)
+                if (existingDoc != null) {
+                    resolver.openOutputStream(existingDoc)
+                        ?: throw IOException("openOutputStream returned null for $jpeg")
+                } else {
+                    createInTree(tree, jpeg)
+                }
+            }
+        }
+    }
+
+    /** Creates a child document under the SAF tree with [name] and opens a stream to it. */
+    private fun createInTree(tree: Uri, name: String): OutputStream {
         val child = DocumentsContract.createDocument(resolver, tree, outputMimeType, name)
             ?: throw IOException("createDocument returned null for $name")
         return resolver.openOutputStream(child)
@@ -79,12 +113,73 @@ class KiloPixOutputStreamFactory(
         return names
     }
 
-    /** Inserts a fresh MediaStore Downloads item and opens a stream to it. */
-    private fun openInMediaStore(sourceUri: Uri): OutputStream {
-        val base = OutputFileName.baseName(resolver, sourceUri)
-        val name = OutputFileName.collisionSafeName(OutputFileName.jpegName(base)) { candidate ->
-            mediaStoreNameExists(candidate)
+    /**
+     * Task 13 REPLACE: finds the child document (under [tree]) whose display name exactly
+     * matches [name], returning its document Uri, or null when no exact match exists.
+     *
+     * Matching is case-sensitive with no locale-dependent normalization, consistent with the
+     * case policy across the app (`IMAGE.jpg` != `image.jpg`). A failed provider query is
+     * treated as "no match" so REPLACE falls back to creating the document rather than ever
+     * guessing at (and overwriting) an arbitrary existing document.
+     */
+    private fun findChildDocument(tree: Uri, name: String): Uri? {
+        try {
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+                tree,
+                DocumentsContract.getTreeDocumentId(tree),
+            )
+            val projection = arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                OpenableColumns.DISPLAY_NAME,
+            )
+            resolver.query(children, projection, null, null, null)?.use { cursor ->
+                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                while (cursor.moveToNext()) {
+                    val display = if (nameIdx >= 0) cursor.getString(nameIdx)?.trim() else null
+                    if (display == name) {
+                        val docId = if (idIdx >= 0) cursor.getString(idIdx) else null
+                        if (docId != null) {
+                            return DocumentsContract.buildDocumentUriUsingTree(tree, docId)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Provider does not support querying; treated as no exact match.
         }
+        return null
+    }
+
+    /** Inserts a fresh MediaStore Downloads item and opens a stream to it. */
+    private fun openInMediaStore(sourceUri: Uri, policy: OutputPolicy): OutputStream {
+        val base = OutputFileName.baseName(resolver, sourceUri)
+        val jpeg = OutputFileName.jpegName(base)
+        return when (policy) {
+            OutputPolicy.UNIQUE -> {
+                val name = OutputFileName.collisionSafeName(jpeg) { candidate ->
+                    mediaStoreItemUri(candidate) != null
+                }
+                insertMediaStore(name)
+            }
+            OutputPolicy.REPLACE -> {
+                // Deterministic sanitized target; restrict strictly to the KiloPix MediaStore
+                // output directory. If an item with the exact DISPLAY_NAME already exists there,
+                // write to that item in place; never a ` (1)` suffix, and never an item anywhere
+                // outside the KiloPix destination. The existing item is opened for writing and
+                // never removed as a speculative collision operation.
+                val existing = mediaStoreItemUri(jpeg)
+                if (existing != null) {
+                    resolver.openOutputStream(existing)
+                        ?: throw IOException("openOutputStream returned null for $jpeg")
+                } else {
+                    insertMediaStore(jpeg)
+                }
+            }
+        }
+    }
+
+    private fun insertMediaStore(name: String): OutputStream {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, outputMimeType)
@@ -97,8 +192,13 @@ class KiloPixOutputStreamFactory(
             ?: throw IOException("openOutputStream returned null for $name")
     }
 
-    /** True when a Downloads item with the same display name already exists in our folder. */
-    private fun mediaStoreNameExists(name: String): Boolean {
+    /**
+     * Returns the content Uri of the Downloads item with the exact [name] inside the KiloPix
+     * output directory, or null when no such item exists. Matching uses the exact
+     * `DISPLAY_NAME`-style equality on `DISPLAY_NAME` + `RELATIVE_PATH` — case-sensitive,
+     * so `IMAGE.jpg` and `image.jpg` are distinct targets, exactly as in UNIQUE mode.
+     */
+    private fun mediaStoreItemUri(name: String): Uri? {
         return try {
             val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             val projection = arrayOf(MediaStore.MediaColumns._ID)
@@ -106,10 +206,25 @@ class KiloPixOutputStreamFactory(
                 "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
             val args = arrayOf(name, OutputDestination.defaultRelativePath())
             resolver.query(collection, projection, selection, args, null)?.use { c ->
-                c.count > 0
-            } ?: false
+                if (c.moveToFirst()) {
+                    val idIndex = c.getColumnIndex(MediaStore.MediaColumns._ID)
+                    if (idIndex >= 0) {
+                        MediaStore.Downloads.getContentUri(
+                            MediaStore.VOLUME_EXTERNAL_PRIMARY,
+                            c.getLong(idIndex),
+                        )
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            } ?: null
         } catch (e: Exception) {
-            false
+            // Failed provider query in UNIQUE mode previously meant "assume free name";
+            // in REPLACE mode a failed query must never be treated as a target to overwrite,
+            // so fall back to creating the document rather than guessing an existing one.
+            null
         }
     }
 }

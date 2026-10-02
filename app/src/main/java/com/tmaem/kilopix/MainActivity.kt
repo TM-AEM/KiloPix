@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.view.View
+import android.widget.Switch
 import android.widget.TextView
 
 /**
@@ -23,6 +24,11 @@ import android.widget.TextView
  * the existing pipeline (decode -> Quick compression -> Task 11 metadata -> OutputStreamFactory
  * -> persistent destination) off the main thread. All storage I/O is delegated to the SAF /
  * MediaStore providers; no storage permission and no filesystem paths are used.
+ *
+ * Task 13 scope (added): an explicit, persisted "Replace existing files" toggle
+ * ([OutputPolicyStore]) that selects the UNIQUE (default, Task 12) or REPLACE output policy.
+ * The factory derives a sanitized name and, in REPLACE mode, overwrites the existing output in
+ * place. Task 12 SAF permission persistence is untouched.
  */
 class MainActivity : Activity() {
 
@@ -34,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var destinationValue: TextView
     private lateinit var resetDestination: TextView
     private lateinit var saveStatus: TextView
+    private lateinit var replaceExistingSwitch: Switch
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +51,14 @@ class MainActivity : Activity() {
         destinationValue = findViewById(R.id.option_save_location_value)
         resetDestination = findViewById(R.id.action_reset_destination)
         saveStatus = findViewById(R.id.save_status)
+        replaceExistingSwitch = findViewById(R.id.option_replace_existing)
+
+        // Task 13: restore the persisted "Replace existing files" preference (default OFF)
+        // and keep it in sync so the value survives Activity recreation and app restart.
+        replaceExistingSwitch.isChecked = OutputPolicyStore.isReplaceEnabled(this)
+        replaceExistingSwitch.setOnCheckedChangeListener { _, isChecked ->
+            OutputPolicyStore.setReplaceEnabled(this, isChecked)
+        }
 
         restoreSelection(savedInstanceState)
 
