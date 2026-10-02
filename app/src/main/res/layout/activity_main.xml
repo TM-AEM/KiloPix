@@ -302,6 +302,43 @@
                     android:contentDescription="@string/option_replace_existing"
                     android:minHeight="@dimen/switch_min_height" />
             </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_3"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/TextAppearance.KiloPix.Label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/option_strip_metadata" />
+
+                    <TextView
+                        style="@style/TextAppearance.KiloPix.Helper"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_1"
+                        android:text="@string/option_strip_metadata_hint" />
+                </LinearLayout>
+
+                <Switch
+                    android:id="@+id/option_strip_metadata"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_2"
+                    android:checked="false"
+                    android:contentDescription="@string/option_strip_metadata"
+                    android:minHeight="@dimen/switch_min_height" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

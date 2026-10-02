@@ -31,6 +31,10 @@ import android.widget.TextView
  * ([OutputPolicyStore]) that selects the UNIQUE (default, Task 12) or REPLACE output policy.
  * The factory derives a sanitized name and, in REPLACE mode, overwrites the existing output in
  * place. Task 12 SAF permission persistence is untouched.
+ *
+ * Task 16 scope (added): a persisted "Strip metadata" toggle ([SettingsStore]) that drives the
+ * existing Task 11 EXIF/GPS policy (PRESERVE/PRESERVE when OFF, REMOVE/REMOVE when ON) through
+ * [SaveCoordinator].
  */
 class MainActivity : Activity() {
 
@@ -49,6 +53,7 @@ class MainActivity : Activity() {
     private lateinit var resetDestination: TextView
     private lateinit var saveStatus: TextView
     private lateinit var replaceExistingSwitch: Switch
+    private lateinit var stripMetadataSwitch: Switch
     private lateinit var actionShare: View
     private lateinit var actionShareAll: View
 
@@ -66,6 +71,7 @@ class MainActivity : Activity() {
         resetDestination = findViewById(R.id.action_reset_destination)
         saveStatus = findViewById(R.id.save_status)
         replaceExistingSwitch = findViewById(R.id.option_replace_existing)
+        stripMetadataSwitch = findViewById(R.id.option_strip_metadata)
         actionShare = findViewById(R.id.action_share)
         actionShareAll = findViewById(R.id.action_share_all)
         resultsContainer = findViewById(R.id.results_container)
@@ -80,6 +86,13 @@ class MainActivity : Activity() {
         replaceExistingSwitch.isChecked = OutputPolicyStore.isReplaceEnabled(this)
         replaceExistingSwitch.setOnCheckedChangeListener { _, isChecked ->
             OutputPolicyStore.setReplaceEnabled(this, isChecked)
+        }
+
+        // Task 16: restore the persisted "Strip metadata" preference (default OFF) and
+        // keep it in sync so the value survives Activity recreation and app restart.
+        stripMetadataSwitch.isChecked = SettingsStore.stripMetadata(this)
+        stripMetadataSwitch.setOnCheckedChangeListener { _, isChecked ->
+            SettingsStore.setStripMetadata(this, isChecked)
         }
 
         restoreSelection(savedInstanceState)
@@ -290,6 +303,8 @@ class MainActivity : Activity() {
         val requests = selectedUris.map { uri ->
             BatchCompressionRequest.Quick(uri)
         }
+        // Task 16: capture the strip-metadata state so the policy is stable for the run.
+        val strip = stripMetadataSwitch.isChecked
         val coordinator = SaveCoordinator(KiloPixOutputStreamFactory(applicationContext))
         val total = requests.size
 
@@ -297,8 +312,16 @@ class MainActivity : Activity() {
             val result = coordinator.process(
                 resolver = resolver,
                 requests = requests,
-                metadataPolicy = ExifMetadataHandler.MetadataPolicy.PRESERVE,
-                gpsPolicy = ExifMetadataHandler.ExifGpsPolicy.PRESERVE,
+                metadataPolicy = if (strip) {
+                    ExifMetadataHandler.MetadataPolicy.REMOVE
+                } else {
+                    ExifMetadataHandler.MetadataPolicy.PRESERVE
+                },
+                gpsPolicy = if (strip) {
+                    ExifMetadataHandler.ExifGpsPolicy.REMOVE
+                } else {
+                    ExifMetadataHandler.ExifGpsPolicy.PRESERVE
+                },
             )
             val items = buildResultItems(result)
             runOnUiThread {
