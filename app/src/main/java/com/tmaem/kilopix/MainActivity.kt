@@ -35,12 +35,17 @@ class MainActivity : Activity() {
     private val selectedUris = ArrayList<Uri>()
     private var saveInProgress = false
 
+    /** Task 14: successful output Uris scoped to the most recent save operation. */
+    private var currentShareUris: List<Uri> = emptyList()
+
     private lateinit var selectionSummary: TextView
     private lateinit var selectionNames: TextView
     private lateinit var destinationValue: TextView
     private lateinit var resetDestination: TextView
     private lateinit var saveStatus: TextView
     private lateinit var replaceExistingSwitch: Switch
+    private lateinit var actionShare: View
+    private lateinit var actionShareAll: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +57,12 @@ class MainActivity : Activity() {
         resetDestination = findViewById(R.id.action_reset_destination)
         saveStatus = findViewById(R.id.save_status)
         replaceExistingSwitch = findViewById(R.id.option_replace_existing)
+        actionShare = findViewById(R.id.action_share)
+        actionShareAll = findViewById(R.id.action_share_all)
+
+        actionShare.setOnClickListener { shareFirstOutput() }
+        actionShareAll.setOnClickListener { shareAllOutputs() }
+        renderShareActions()
 
         // Task 13: restore the persisted "Replace existing files" preference (default OFF)
         // and keep it in sync so the value survives Activity recreation and app restart.
@@ -251,6 +262,11 @@ class MainActivity : Activity() {
         }
         if (saveInProgress) return
 
+        // Task 14: clear any previous operation's share state so stale outputs can never
+        // be shared after a new save. The new operation populates the fresh results only.
+        currentShareUris = emptyList()
+        renderShareActions()
+
         saveInProgress = true
         saveStatus.text = getString(R.string.save_in_progress)
         saveStatus.visibility = View.VISIBLE
@@ -277,8 +293,42 @@ class MainActivity : Activity() {
                     getString(R.string.save_failed, result.failedCount, total)
                 }
                 saveStatus.visibility = View.VISIBLE
+                // Populate share state only from the current successful outputs.
+                currentShareUris = result.itemResults
+                    .filterIsInstance<BatchItemResult.Success>()
+                    .mapNotNull { it.outputUri }
+                    .let(ImageShareHelper::unique)
+                renderShareActions()
             }
         }.start()
+    }
+
+    /**
+     * Task 14 share visibility. Share actions are only shown after a save completed (not
+     * while saving) and only when at least one successful output Uri exists:
+     *  - exactly one successful output -> Share; Share All hidden.
+     *  - two or more successful outputs -> Share All; Share hidden.
+     *  - zero successful outputs (or while saving) -> both hidden.
+     */
+    private fun renderShareActions() {
+        val count = currentShareUris.size
+        val sharing = !saveInProgress
+        actionShare.visibility = if (sharing && count == 1) View.VISIBLE else View.GONE
+        actionShareAll.visibility = if (sharing && count >= 2) View.VISIBLE else View.GONE
+    }
+
+    /** Shares a single output (the first of the current successful outputs). */
+    private fun shareFirstOutput() {
+        val uri = currentShareUris.firstOrNull() ?: return
+        val intent = ImageShareHelper.singleShareIntent(this, uri, getString(R.string.app_name))
+        ImageShareHelper.launch(this, intent, getString(R.string.share_title))
+    }
+
+    /** Shares every successful output of the current save operation. */
+    private fun shareAllOutputs() {
+        if (currentShareUris.isEmpty()) return
+        val intent = ImageShareHelper.batchShareIntent(this, currentShareUris, getString(R.string.app_name))
+        ImageShareHelper.launch(this, intent, getString(R.string.share_all_title))
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

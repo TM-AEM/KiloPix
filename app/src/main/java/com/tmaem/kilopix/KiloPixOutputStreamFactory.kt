@@ -28,17 +28,23 @@ import java.io.OutputStream
  * KiloPix destination, never silently swallows a replacement, and never uses [java.io.File]
  * against a SAF tree or MediaStore destination. All destination I/O is delegated to the
  * framework providers.
+ *
+ * Task 14: it additionally implements [OpenedOutputProvider], pairing each opened OutputStream
+ * with the exact content Uri it writes to, so the save layer can expose that Uri for sharing.
+ * The destination behavior (Task 12 storage) and naming/replacement (Task 13) are unchanged.
  */
 class KiloPixOutputStreamFactory(
     private val context: Context,
-) : OutputStreamFactory {
+) : OutputStreamFactory, OpenedOutputProvider {
 
     private val resolver: ContentResolver get() = context.contentResolver
 
     /** KiloPix always encodes JPEG. */
     private val outputMimeType: String = "image/jpeg"
 
-    override fun open(sourceUri: Uri): OutputStream {
+    override fun open(sourceUri: Uri): OutputStream = openWithUri(sourceUri).stream
+
+    override fun openWithUri(sourceUri: Uri): OpenedOutput {
         val tree = OutputDestination.validateCustomTree(context)
         val policy = OutputPolicyStore.current(context)
         return if (tree != null) openInTree(tree, sourceUri, policy) else openInMediaStore(sourceUri, policy)
@@ -55,7 +61,7 @@ class KiloPixOutputStreamFactory(
      * create the document. The existing document is opened for writing first; it is never
      * deleted before a direct overwrite is attempted.
      */
-    private fun openInTree(tree: Uri, sourceUri: Uri, policy: OutputPolicy): OutputStream {
+    private fun openInTree(tree: Uri, sourceUri: Uri, policy: OutputPolicy): OpenedOutput {
         val base = OutputFileName.baseName(resolver, sourceUri)
         val jpeg = OutputFileName.jpegName(base)
         return when (policy) {
@@ -71,8 +77,7 @@ class KiloPixOutputStreamFactory(
             OutputPolicy.REPLACE -> {
                 val existingDoc = findChildDocument(tree, jpeg)
                 if (existingDoc != null) {
-                    resolver.openOutputStream(existingDoc)
-                        ?: throw IOException("openOutputStream returned null for $jpeg")
+                    openWithUriAt(existingDoc)
                 } else {
                     createInTree(tree, jpeg)
                 }
@@ -81,11 +86,10 @@ class KiloPixOutputStreamFactory(
     }
 
     /** Creates a child document under the SAF tree with [name] and opens a stream to it. */
-    private fun createInTree(tree: Uri, name: String): OutputStream {
+    private fun createInTree(tree: Uri, name: String): OpenedOutput {
         val child = DocumentsContract.createDocument(resolver, tree, outputMimeType, name)
             ?: throw IOException("createDocument returned null for $name")
-        return resolver.openOutputStream(child)
-            ?: throw IOException("openOutputStream returned null for $name")
+        return openWithUriAt(child)
     }
 
     /**
@@ -152,7 +156,7 @@ class KiloPixOutputStreamFactory(
     }
 
     /** Inserts a fresh MediaStore Downloads item and opens a stream to it. */
-    private fun openInMediaStore(sourceUri: Uri, policy: OutputPolicy): OutputStream {
+    private fun openInMediaStore(sourceUri: Uri, policy: OutputPolicy): OpenedOutput {
         val base = OutputFileName.baseName(resolver, sourceUri)
         val jpeg = OutputFileName.jpegName(base)
         return when (policy) {
@@ -169,17 +173,12 @@ class KiloPixOutputStreamFactory(
                 // outside the KiloPix destination. The existing item is opened for writing and
                 // never removed as a speculative collision operation.
                 val existing = mediaStoreItemUri(jpeg)
-                if (existing != null) {
-                    resolver.openOutputStream(existing)
-                        ?: throw IOException("openOutputStream returned null for $jpeg")
-                } else {
-                    insertMediaStore(jpeg)
-                }
+                if (existing != null) openWithUriAt(existing) else insertMediaStore(jpeg)
             }
         }
     }
 
-    private fun insertMediaStore(name: String): OutputStream {
+    private fun insertMediaStore(name: String): OpenedOutput {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, outputMimeType)
@@ -188,8 +187,14 @@ class KiloPixOutputStreamFactory(
         val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val uri = resolver.insert(collection, values)
             ?: throw IOException("MediaStore insert returned null for $name")
-        return resolver.openOutputStream(uri)
-            ?: throw IOException("openOutputStream returned null for $name")
+        return openWithUriAt(uri)
+    }
+
+    /** Opens the stream for the exact output [uri] and pairs it with that same Uri. */
+    private fun openWithUriAt(uri: Uri): OpenedOutput {
+        val stream = resolver.openOutputStream(uri)
+            ?: throw IOException("openOutputStream returned null for $uri")
+        return OpenedOutput(stream = stream, uri = uri)
     }
 
     /**

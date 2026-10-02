@@ -104,6 +104,7 @@ class SaveCoordinator(
         val bitmap = source.bitmap
 
         var output: OutputStream? = null
+        var outputUri: Uri? = null
         return try {
             val encoded = encode(request, source)
 
@@ -115,8 +116,10 @@ class SaveCoordinator(
                 gpsPolicy,
             )
 
-            output = try {
-                outputStreamFactory.open(uri)
+            try {
+                val opened = openedOutput(request.sourceUri)
+                output = opened.stream
+                outputUri = opened.uri.takeUnless { it == Uri.EMPTY }
             } catch (e: Exception) {
                 return BatchItemResult.Failure(uri, BatchFailureReason.OUTPUT_STREAM_FAILURE)
             }
@@ -143,6 +146,7 @@ class SaveCoordinator(
                 width = bitmap.width,
                 height = bitmap.height,
                 quality = encoded.quality,
+                outputUri = outputUri,
             )
         } catch (e: MetadataSaveException) {
             BatchItemResult.Failure(uri, BatchFailureReason.UNEXPECTED_FAILURE)
@@ -165,6 +169,18 @@ class SaveCoordinator(
     }
 
     private class Encoded(val bytes: ByteArray, val quality: Int)
+
+    /**
+     * Opens the destination stream paired with its exact output Uri for [sourceUri],
+     * preferring the [OpenedOutputProvider] capability when the factory supports it.
+     *
+     * When the factory is only a plain [OutputStreamFactory] (no Uri reporting), the stream
+     * is still opened and the Uri stays null (so [BatchItemResult.Success.outputUri] is null
+     * and the item is not offerable for sharing — save behavior is unchanged).
+     */
+    private fun openedOutput(sourceUri: Uri): OpenedOutput =
+        (outputStreamFactory as? OpenedOutputProvider)?.openWithUri(sourceUri)
+            ?: OpenedOutput(stream = outputStreamFactory.open(sourceUri), uri = Uri.EMPTY)
 
     /** Runs the selected engine into a bounded in-memory buffer and returns the bytes + quality. */
     private fun encode(request: BatchCompressionRequest, source: DecodeResult.Success): Encoded {

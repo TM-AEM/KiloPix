@@ -325,6 +325,31 @@ fun interface OutputStreamFactory {
     fun open(sourceUri: Uri): OutputStream
 }
 
+/**
+ * An [OutputStream] paired with the exact content Uri it was/will be created from.
+ *
+ * This is the Task 14 sharing primitive: it lets the save layer know precisely which
+ * output document is being written, without weakening the queue's stream-ownership
+ * contract (the queue still owns and closes only the [stream]). The [uri] must be the
+ * actual destination that [stream] writes to — never a source, tree/root, `file://` or
+ * stale Uri.
+ */
+data class OpenedOutput(
+    val stream: OutputStream,
+    val uri: Uri,
+)
+
+/**
+ * A [OutputStreamFactory] that additionally reports the exact output Uri paired with
+ * each opened stream. This is an additive, optional capability layered alongside the
+ * existing [OutputStreamFactory] contract. `BatchCompressionQueue` does not require it;
+ * the save path ([SaveCoordinator]) uses it to expose the written Uri for sharing.
+ */
+interface OpenedOutputProvider {
+    /** Opens the destination stream and its exact content Uri for [sourceUri]. */
+    fun openWithUri(sourceUri: Uri): OpenedOutput
+}
+
 /** Cooperative cancellation signal polled by the queue between items. */
 fun interface BatchCancellationSignal {
 
@@ -389,6 +414,8 @@ sealed interface BatchItemResult {
         val width: Int,
         val height: Int,
         val quality: Int,
+        /** The final content Uri that was actually written, or null when unavailable. */
+        val outputUri: Uri? = null,
     ) : BatchItemResult
 
     data class Failure(

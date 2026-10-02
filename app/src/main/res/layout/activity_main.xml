@@ -328,6 +328,32 @@
             android:accessibilityLiveRegion="polite"
             android:visibility="gone" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/action_share"
+                style="@style/Widget.KiloPix.SecondaryButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/action_share"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/action_share_all"
+                style="@style/Widget.KiloPix.SecondaryButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_2"
+                android:layout_weight="1"
+                android:text="@string/action_share_all"
+                android:visibility="gone" />
+        </LinearLayout>
+
         <!-- Secondary actions (intentionally disabled placeholders) -->
         <LinearLayout
             android:layout_width="match_parent"

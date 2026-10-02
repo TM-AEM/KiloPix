@@ -41,4 +41,9 @@
     <string name="save_empty">Select images to compress first</string>
     <string name="save_success">Saved %1$d of %2$d images</string>
     <string name="save_failed">Save failed for %1$d of %2$d images</string>
+
+    <string name="action_share">Share</string>
+    <string name="action_share_all">Share All</string>
+    <string name="share_title">Share image</string>
+    <string name="share_all_title">Share images</string>
 </resources>
