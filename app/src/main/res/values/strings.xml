@@ -30,4 +30,14 @@
         <item quantity="one">%1$d image selected</item>
         <item quantity="other">%1$d images selected</item>
     </plurals>
+
+    <string name="action_compress">Compress &amp; Save</string>
+    <string name="action_reset_destination">Reset</string>
+    <string name="save_location_desc">Choose an output folder for compressed images</string>
+    <string name="save_destination_default">Downloads (KiloPix)</string>
+    <string name="compressed_folder">Selected folder</string>
+    <string name="save_in_progress">Saving…</string>
+    <string name="save_empty">Select images to compress first</string>
+    <string name="save_success">Saved %1$d of %2$d images</string>
+    <string name="save_failed">Save failed for %1$d of %2$d images</string>
 </resources>

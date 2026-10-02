@@ -239,8 +239,13 @@
                 android:background="@color/outline" />
 
             <LinearLayout
+                android:id="@+id/option_save_location_row"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="@string/save_location_desc"
                 android:orientation="horizontal">
 
                 <TextView
@@ -251,10 +256,22 @@
                     android:text="@string/option_save_location" />
 
                 <TextView
+                    android:id="@+id/option_save_location_value"
                     style="@style/TextAppearance.KiloPix.Helper"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/option_not_set" />
+
+                <TextView
+                    android:id="@+id/action_reset_destination"
+                    style="@style/TextAppearance.KiloPix.Helper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_2"
+                    android:padding="@dimen/space_1"
+                    android:text="@string/action_reset_destination"
+                    android:textColor="?android:attr/textColorLink"
+                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
 
@@ -264,6 +281,23 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_2"
             android:text="@string/options_helper" />
+
+        <Button
+            android:id="@+id/action_compress"
+            style="@style/Widget.KiloPix.SecondaryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_3"
+            android:text="@string/action_compress" />
+
+        <TextView
+            android:id="@+id/save_status"
+            style="@style/TextAppearance.KiloPix.Label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone" />
 
         <!-- Secondary actions (intentionally disabled placeholders) -->
         <LinearLayout
