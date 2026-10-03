@@ -26,6 +26,14 @@ object OutputFileName {
     private const val DEFAULT_BASE = "compressed"
     private const val JPEG_EXTENSION = ".jpg"
 
+    /**
+     * Conservative cap on the sanitized base name (Task 18). Prevents pathologically long
+     * source filenames from producing a provider-rejected output document name. The cap is
+     * applied to the base only (before the `.jpg` extension and any ` (N)` collision suffix),
+     * so it cannot strip the extension or produce an empty name.
+     */
+    private const val MAX_BASE_LENGTH = 80
+
     /** Base name (no extension) derived from the source display name, else [DEFAULT_BASE]. */
     fun baseName(resolver: ContentResolver, sourceUri: Uri): String {
         val display = queryDisplayName(resolver, sourceUri) ?: return DEFAULT_BASE
@@ -51,11 +59,18 @@ object OutputFileName {
      *
      * @return the sanitized name, or [DEFAULT_BASE] ("compressed") when nothing remains.
      */
-    fun sanitizeBase(raw: String): String = buildString {
-        for (ch in raw) {
-            if (!isUnsafeForFilename(ch)) append(ch)
+    fun sanitizeBase(raw: String): String {
+        val sanitized = buildString {
+            for (ch in raw) {
+                if (!isUnsafeForFilename(ch)) append(ch)
+            }
+            if (isEmpty()) append(DEFAULT_BASE)
         }
-        if (isEmpty()) append(DEFAULT_BASE)
+        return if (sanitized.length > MAX_BASE_LENGTH) {
+            sanitized.take(MAX_BASE_LENGTH)
+        } else {
+            sanitized
+        }
     }
 
     private fun isUnsafeForFilename(ch: Char): Boolean = when {

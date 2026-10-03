@@ -41,6 +41,20 @@ class MainActivity : Activity() {
     private val selectedUris = ArrayList<Uri>()
     private var saveInProgress = false
 
+    /**
+     * Task 18: cooperative cancellation. Set on Activity destruction so background
+     * processing stops at safe per-item boundaries without killing a thread. Safe and
+     * idempotent: already-completed outputs are never invalidated.
+     */
+    @Volatile
+    private var saveCancelled = false
+
+    /** Fed to [SaveCoordinator.process] via the existing [BatchCancellationSignal] contract. */
+    private val cancellationSignal = BatchCancellationSignal { saveCancelled }
+
+    /** Task 18: the most recently rendered result rows, kept for config-change restoration. */
+    private var currentResultItems: List<ResultItem> = emptyList()
+
     /** Task 14: successful output Uris scoped to the most recent save operation. */
     private var currentShareUris: List<Uri> = emptyList()
 
@@ -96,6 +110,7 @@ class MainActivity : Activity() {
         }
 
         restoreSelection(savedInstanceState)
+        restoreResults(savedInstanceState)
 
         findViewById<View>(R.id.primary_action).setOnClickListener {
             launchDocumentPicker()
@@ -292,7 +307,9 @@ class MainActivity : Activity() {
         renderShareActions()
 
         // Task 15: clear the previous results list; a new save always starts fresh.
+        // Task 18: also clear the restoration snapshot so a new save never redraws stale rows.
         hideResults()
+        currentResultItems = emptyList()
         sourceSizes = captureSourceSizes(selectedUris)
 
         saveInProgress = true
@@ -322,9 +339,14 @@ class MainActivity : Activity() {
                 } else {
                     ExifMetadataHandler.ExifGpsPolicy.PRESERVE
                 },
+                cancellation = cancellationSignal,
             )
             val items = buildResultItems(result)
             runOnUiThread {
+                // Task 18: never touch a destroyed/finishing Activity's UI. The save output
+                // and its resource cleanup already completed on the background thread, so
+                // there is nothing to undo here — we just avoid rendering into a dead UI.
+                if (isFinishing || isDestroyed) return@runOnUiThread
                 saveInProgress = false
                 saveStatus.text = when {
                     result.successCount == 0 && result.failedCount == 0 ->
@@ -342,6 +364,8 @@ class MainActivity : Activity() {
                     .filterIsInstance<BatchItemResult.Success>()
                     .mapNotNull { it.outputUri }
                     .let(ImageShareHelper::unique)
+                // Task 18: keep the rendered items for config-change restoration.
+                currentResultItems = items
                 renderShareActions()
                 renderResults(items)
             }
@@ -600,10 +624,124 @@ class MainActivity : Activity() {
         ImageShareHelper.launch(this, intent, getString(R.string.share_all_title))
     }
 
+    /**
+     * Task 18: on Activity destruction request cooperative cancellation so any in-flight
+     * background save stops at the next safe per-item boundary. This only sets a volatile
+     * flag; it never kills a thread, never touches the UI and never invalidates already
+     * completed outputs. A recreated Activity starts with a fresh false flag.
+     */
+    override fun onDestroy() {
+        super.onDestroy()
+        saveCancelled = true
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putStringArrayList(STATE_SELECTION, ArrayList(selectedUris.map { it.toString() }))
+        // Task 18: persist the completed results snapshot so the Results UI and sharing
+        // state survive a configuration change. Snapshot is empty while a save is running
+        // (cleared at startSave) or when none completed, so no stale results are restored.
+        if (currentResultItems.isNotEmpty()) {
+            val list = ArrayList<Bundle>(currentResultItems.size)
+            for (item in currentResultItems) list.add(resultItemToBundle(item))
+            outState.putParcelableArrayList(STATE_RESULTS, list)
+        }
     }
+
+    /**
+     * Task 18: restores a previously completed results snapshot after a configuration
+     * change. Deliberately defensive: a malformed or corrupted bundle fails closed and
+     * leaves the Results UI empty rather than crashing, and invalid Uri strings are
+     * ignored (never turned into share targets).
+     */
+    private fun restoreResults(state: Bundle?) {
+        val raw = state?.getParcelableArrayList<Bundle>(STATE_RESULTS) ?: return
+        val items = ArrayList<ResultItem>(raw.size)
+        for (entry in raw) {
+            resultItemFromBundle(entry)?.let { items.add(it) }
+        }
+        if (items.isEmpty()) return
+        currentResultItems = items
+        currentShareUris = items
+            .filterIsInstance<ResultItem.Success>()
+            .mapNotNull { it.outputUri }
+            .let(ImageShareHelper::unique)
+        renderResults(items)
+        renderShareActions()
+    }
+
+    /** Serializes a [ResultItem] into the minimum Bundle needed to rebuild the Results UI. */
+    private fun resultItemToBundle(item: ResultItem): Bundle = when (item) {
+        is ResultItem.Success -> Bundle().apply {
+            putString(STATE_ITEM_TYPE, STATE_TYPE_SUCCESS)
+            putString(STATE_SOURCE_URI, item.sourceUri.toString())
+            putString(STATE_SOURCE_NAME, item.sourceName)
+            item.outputUri?.let { putString(STATE_OUTPUT_URI, it.toString()) }
+            item.outputName?.let { putString(STATE_OUTPUT_NAME, it) }
+            if (item.originalSize != null) putLong(STATE_ORIGINAL_SIZE, item.originalSize)
+            putLong(STATE_COMPRESSED_SIZE, item.compressedSize)
+            putInt(STATE_WIDTH, item.width)
+            putInt(STATE_HEIGHT, item.height)
+            putInt(STATE_QUALITY, item.quality)
+        }
+        is ResultItem.Failure -> Bundle().apply {
+            putString(STATE_ITEM_TYPE, STATE_TYPE_FAILURE)
+            putString(STATE_SOURCE_URI, item.sourceUri.toString())
+            putString(STATE_SOURCE_NAME, item.sourceName)
+            putString(STATE_REASON, item.reason.name)
+        }
+    }
+
+    /** Rebuilds a [ResultItem] from a restored Bundle, or null when the entry is invalid. */
+    private fun resultItemFromBundle(b: Bundle): ResultItem? = try {
+        when (b.getString(STATE_ITEM_TYPE)) {
+            STATE_TYPE_SUCCESS -> {
+                val sourceUri = restoreUri(b.getString(STATE_SOURCE_URI)) ?: return null
+                val sourceName = b.getString(STATE_SOURCE_NAME) ?: return null
+                ResultItem.Success(
+                    sourceUri = sourceUri,
+                    sourceName = sourceName,
+                    outputUri = restoreUri(b.getString(STATE_OUTPUT_URI)),
+                    outputName = b.getString(STATE_OUTPUT_NAME),
+                    originalSize = if (b.containsKey(STATE_ORIGINAL_SIZE)) b.getLong(STATE_ORIGINAL_SIZE) else null,
+                    compressedSize = b.getLong(STATE_COMPRESSED_SIZE),
+                    width = b.getInt(STATE_WIDTH),
+                    height = b.getInt(STATE_HEIGHT),
+                    quality = b.getInt(STATE_QUALITY),
+                )
+            }
+            STATE_TYPE_FAILURE -> {
+                val sourceUri = restoreUri(b.getString(STATE_SOURCE_URI)) ?: return null
+                val sourceName = b.getString(STATE_SOURCE_NAME) ?: return null
+                val reason = b.getString(STATE_REASON)?.let(::restoreFailureReason) ?: return null
+                ResultItem.Failure(sourceUri = sourceUri, sourceName = sourceName, reason = reason)
+            }
+            else -> null
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * Parses a stored output Uri string, returning null (silently ignored) unless it is a
+     * non-empty, parseable `content://` Uri. A malformed or corrupted saved-state Bundle can
+     * otherwise carry a `file://`, `http(s)://` or other non-content Uri into the share path,
+     * so restoration fails closed and only genuine content Uris ever become share targets.
+     */
+    private fun restoreUri(value: String?): Uri? {
+        if (value.isNullOrEmpty()) return null
+        val parsed = try {
+            Uri.parse(value)
+        } catch (e: Exception) {
+            return null
+        }
+        val scheme = parsed.scheme
+        return if (scheme != null && scheme.equals(CONTENT_SCHEME, ignoreCase = true)) parsed else null
+    }
+
+    /** Maps a stored failure-reason name back to an enum, or null when unknown. */
+    private fun restoreFailureReason(name: String): BatchFailureReason? =
+        BatchFailureReason.entries.firstOrNull { it.name == name }
 
     private fun restoreSelection(state: Bundle?) {
         val stored = state?.getStringArrayList(STATE_SELECTION) ?: return
@@ -617,6 +755,21 @@ class MainActivity : Activity() {
         const val REQUEST_OPEN_DOCUMENT = 1001
         const val REQUEST_OPEN_TREE = 1002
         const val STATE_SELECTION = "com.tmaem.kilopix.selection"
+        const val STATE_RESULTS = "com.tmaem.kilopix.results"
+        const val STATE_ITEM_TYPE = "type"
+        const val STATE_TYPE_SUCCESS = "success"
+        const val STATE_TYPE_FAILURE = "failure"
+        const val STATE_SOURCE_URI = "source_uri"
+        const val STATE_SOURCE_NAME = "source_name"
+        const val STATE_OUTPUT_URI = "output_uri"
+        const val STATE_OUTPUT_NAME = "output_name"
+        const val STATE_ORIGINAL_SIZE = "original_size"
+        const val STATE_COMPRESSED_SIZE = "compressed_size"
+        const val STATE_WIDTH = "width"
+        const val STATE_HEIGHT = "height"
+        const val STATE_QUALITY = "quality"
+        const val STATE_REASON = "reason"
+        const val CONTENT_SCHEME = "content"
         const val MAX_LISTED_NAMES = 5
         const val ELLIPSIS = "\u2026"
     }
