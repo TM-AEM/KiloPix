@@ -84,7 +84,8 @@ object ExifMetadataHandler {
 
         /**
          * The encoded [jpegBytes] is returned safely unchanged because there was no
-         * source EXIF to preserve. Metadata preservation is **not** claimed.
+         * source EXIF to preserve, or the source format does not support raw JPEG EXIF
+         * APP1 preservation. Metadata preservation is **not** claimed.
          */
         data class MetadataUnavailable(
             val jpegBytes: ByteArray,
@@ -207,15 +208,7 @@ object ExifMetadataHandler {
 
         val app1 = when (sourceExif) {
             is SourceExif.Found -> sourceExif.segment
-            SourceExif.NotJpeg ->
-                return ExifMetadataResult.Failure(ExifMetadataFailureReason.UNSUPPORTED_FORMAT)
-            SourceExif.NoExif, SourceExif.TooLarge ->
-                return ExifMetadataResult.MetadataUnavailable(
-                    jpegBytes = encodedJpeg,
-                    reason = ExifMetadataFailureReason.EXIF_UNAVAILABLE,
-                )
-            SourceExif.InvalidJpeg ->
-                return ExifMetadataResult.Failure(ExifMetadataFailureReason.INVALID_JPEG)
+            else -> return preserveFallback(sourceExif.toKind(), encodedJpeg)
         }
 
         val preserved = if (gpsPolicy == ExifGpsPolicy.PRESERVE) {
@@ -361,6 +354,68 @@ object ExifMetadataHandler {
         object NoExif : SourceExif
         object TooLarge : SourceExif
         object InvalidJpeg : SourceExif
+    }
+
+    /** Observable source-format classification for tests and the PRESERVE fallback. */
+    internal enum class SourceExifKind {
+        FOUND,
+        NOT_JPEG,
+        NO_EXIF,
+        TOO_LARGE,
+        INVALID_JPEG,
+    }
+
+    internal fun classifySource(input: InputStream): SourceExifKind =
+        scanSourceForExif(input).toKind()
+
+    /**
+     * Maps a PRESERVE-path source classification onto a result that never claims
+     * metadata was preserved when it was not. A non-JPEG source is a controlled
+     * limitation ([ExifMetadataFailureReason.UNSUPPORTED_FORMAT]), not a failed save.
+     */
+    internal fun preserveFallback(
+        kind: SourceExifKind?,
+        encodedJpeg: ByteArray,
+    ): ExifMetadataResult {
+        return when (kind) {
+            null -> ExifMetadataResult.Failure(ExifMetadataFailureReason.SOURCE_INACCESSIBLE)
+            SourceExifKind.FOUND ->
+                ExifMetadataResult.Failure(ExifMetadataFailureReason.UNEXPECTED)
+            SourceExifKind.NOT_JPEG ->
+                ExifMetadataResult.MetadataUnavailable(
+                    jpegBytes = encodedJpeg,
+                    reason = ExifMetadataFailureReason.UNSUPPORTED_FORMAT,
+                )
+            SourceExifKind.NO_EXIF, SourceExifKind.TOO_LARGE ->
+                ExifMetadataResult.MetadataUnavailable(
+                    jpegBytes = encodedJpeg,
+                    reason = ExifMetadataFailureReason.EXIF_UNAVAILABLE,
+                )
+            SourceExifKind.INVALID_JPEG ->
+                ExifMetadataResult.Failure(ExifMetadataFailureReason.INVALID_JPEG)
+        }
+    }
+
+    internal fun removeExifFromEncoded(encodedJpeg: ByteArray): ExifMetadataResult {
+        if (encodedJpeg.isEmpty()) {
+            return ExifMetadataResult.Failure(ExifMetadataFailureReason.INVALID_INPUT)
+        }
+        if (encodedJpeg.size < 2 || u(encodedJpeg[0]) != MARKER || u(encodedJpeg[1]) != SOI_MARKER) {
+            return ExifMetadataResult.Failure(ExifMetadataFailureReason.INVALID_JPEG)
+        }
+        val scan = scanJpeg(encodedJpeg)
+            ?: return ExifMetadataResult.Failure(ExifMetadataFailureReason.INVALID_JPEG)
+        val rebuilt = rebuildWithoutExif(encodedJpeg, scan)
+            ?: return ExifMetadataResult.Failure(ExifMetadataFailureReason.METADATA_WRITE_FAILED)
+        return ExifMetadataResult.Success(rebuilt, orientation = null)
+    }
+
+    private fun SourceExif.toKind(): SourceExifKind = when (this) {
+        is SourceExif.Found -> SourceExifKind.FOUND
+        SourceExif.NotJpeg -> SourceExifKind.NOT_JPEG
+        SourceExif.NoExif -> SourceExifKind.NO_EXIF
+        SourceExif.TooLarge -> SourceExifKind.TOO_LARGE
+        SourceExif.InvalidJpeg -> SourceExifKind.INVALID_JPEG
     }
 
     /**
