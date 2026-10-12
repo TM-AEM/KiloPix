@@ -8,8 +8,13 @@ import java.io.OutputStream
  * metadata, then perform exactly **one** JPEG encoding via [JpegCompressionEngine].
  *
  * Task 06 scope: this layer contains no target-size logic, no quality search, no
- * repeated encoding and no resizing. The output is always JPEG at the full input
- * dimensions.
+ * repeated encoding and no resizing.
+ *
+ * Quality is selected from the original source pixel dimensions, but JPEG encoding is
+ * performed on the decoded bitmap, whose dimensions are the source dimensions unless
+ * [ImageDecoder.decode] applied memory-safe sampling to fit the heap budget.
+ * [DecodeResult.sourceWidth] and [DecodeResult.sourceHeight] always hold the original
+ * input dimensions; the encoded bitmap may be smaller when sampling is applied.
  *
  * ## Quality policy (application policy, not a mathematically optimal model)
  * Bands are based on the source pixel count, computed with [Long] to avoid overflow:

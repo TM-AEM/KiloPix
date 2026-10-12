@@ -143,6 +143,8 @@ class SaveCoordinator(
             BatchItemResult.Success(
                 sourceUri = uri,
                 bytesWritten = finalBytes.size.toLong(),
+                sourceWidth = source.sourceWidth,
+                sourceHeight = source.sourceHeight,
                 width = bitmap.width,
                 height = bitmap.height,
                 quality = encoded.quality,

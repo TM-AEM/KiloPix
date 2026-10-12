@@ -135,6 +135,19 @@ object ImageDecoder {
         return MAX_SAMPLE_SIZE
     }
 
+    /**
+     * Pixel size of a decode that applied [sampleSize] (power-of-two [inSampleSize]).
+     * Integer division matches [BitmapFactory]; this does not rotate pixels.
+     */
+    internal fun sampledPixelDimensions(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        sampleSize: Int,
+    ): PixelSize {
+        val sample = sampleSize.coerceAtLeast(1)
+        return PixelSize(sourceWidth / sample, sourceHeight / sample)
+    }
+
     /** Keeps the decoded bitmap within roughly a quarter of the process heap. */
     private fun defaultMaxDecodeBytes(): Int {
         val budget = Runtime.getRuntime().maxMemory() / 4
@@ -166,4 +179,35 @@ enum class DecodeFailureReason {
     INVALID_DIMENSIONS,
     DECODE_FAILED,
     OUT_OF_MEMORY,
+}
+
+/** Width and height in storage-order pixels (no EXIF orientation swap). */
+data class PixelSize(val width: Int, val height: Int)
+
+/**
+ * Distinguishes original source pixels from the pixels actually encoded.
+ * [wasSampled] is true when decode-time sampling reduced the encoded size.
+ */
+data class ImageSizeReport(
+    val sourceWidth: Int,
+    val sourceHeight: Int,
+    val encodedWidth: Int,
+    val encodedHeight: Int,
+) {
+    val wasSampled: Boolean
+        get() = encodedWidth != sourceWidth || encodedHeight != sourceHeight
+
+    companion object {
+        fun forQuick(
+            sourceWidth: Int,
+            sourceHeight: Int,
+            encodedWidth: Int,
+            encodedHeight: Int,
+        ): ImageSizeReport = ImageSizeReport(
+            sourceWidth = sourceWidth,
+            sourceHeight = sourceHeight,
+            encodedWidth = encodedWidth,
+            encodedHeight = encodedHeight,
+        )
+    }
 }

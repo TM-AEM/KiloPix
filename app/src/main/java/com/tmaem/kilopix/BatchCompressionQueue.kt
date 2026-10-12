@@ -217,6 +217,8 @@ class BatchCompressionQueue(
                     is QuickCompressionResult.Success -> BatchItemResult.Success(
                         sourceUri = uri,
                         bytesWritten = result.bytesWritten,
+                        sourceWidth = source.sourceWidth,
+                        sourceHeight = source.sourceHeight,
                         width = bitmap.width,
                         height = bitmap.height,
                         quality = result.quality,
@@ -236,6 +238,8 @@ class BatchCompressionQueue(
                     is TargetSizeCompressionResult.Success -> BatchItemResult.Success(
                         sourceUri = uri,
                         bytesWritten = result.bytesWritten,
+                        sourceWidth = source.sourceWidth,
+                        sourceHeight = source.sourceHeight,
                         width = bitmap.width,
                         height = bitmap.height,
                         quality = result.quality,
@@ -257,6 +261,8 @@ class BatchCompressionQueue(
                     is ManualCompressionResult.Success -> BatchItemResult.Success(
                         sourceUri = uri,
                         bytesWritten = result.bytesWritten,
+                        sourceWidth = source.sourceWidth,
+                        sourceHeight = source.sourceHeight,
                         width = result.width,
                         height = result.height,
                         quality = result.quality,
@@ -401,8 +407,9 @@ sealed interface BatchCompressionRequest {
 /**
  * Immutable per-item outcome.
  *
- * [Success.width] and [Success.height] are the dimensions of the encoded output
- * (the decoded bitmap for Quick/Target, the requested size for Manual).
+ * [Success.width] and [Success.height] are the encoded output pixels (the decoded
+ * bitmap for Quick/Target, the requested size for Manual). [Success.sourceWidth]
+ * and [Success.sourceHeight] are the original source pixels from the decoder.
  */
 sealed interface BatchItemResult {
 
@@ -411,6 +418,8 @@ sealed interface BatchItemResult {
     data class Success(
         override val sourceUri: Uri,
         val bytesWritten: Long,
+        val sourceWidth: Int,
+        val sourceHeight: Int,
         val width: Int,
         val height: Int,
         val quality: Int,

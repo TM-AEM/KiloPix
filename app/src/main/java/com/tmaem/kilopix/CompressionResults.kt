@@ -29,6 +29,13 @@ internal sealed interface ResultItem {
         val originalSize: Long?,
         /** Compressed/output byte size ([BatchItemResult.Success.bytesWritten]). */
         val compressedSize: Long,
+        /** Original input pixels as reported by the decoder. */
+        val sourceWidth: Int,
+        val sourceHeight: Int,
+        /** Actual pixels of the encoded output (may be downsampled from [sourceWidth]). */
+        val encodedWidth: Int,
+        val encodedHeight: Int,
+        /** Original encoded width and height kept for backward compatibility. */
         val width: Int,
         val height: Int,
         val quality: Int,
@@ -105,5 +112,23 @@ internal object ResultsFormatter {
         if (compressed <= original) return null
         val growth = (compressed - original).toDouble() / original.toDouble()
         return (growth * 100.0).toInt()
+    }
+
+    /**
+     * Returns the encoded pixel dimensions. When encoding did not change the size,
+     * only that pair is shown. When sampling reduced the encoded pixels, the encoded
+     * pair is shown followed by the original source pair so the distinction is visible.
+     */
+    fun formatPixelDimensions(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        encodedWidth: Int,
+        encodedHeight: Int,
+    ): String {
+        return if (sourceWidth == encodedWidth && sourceHeight == encodedHeight) {
+            "%d × %d".format(encodedWidth, encodedHeight)
+        } else {
+            "%d × %d (from %d × %d)".format(encodedWidth, encodedHeight, sourceWidth, sourceHeight)
+        }
     }
 }

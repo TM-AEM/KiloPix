@@ -418,6 +418,10 @@ class MainActivity : Activity() {
                     outputName = item.outputUri?.let(::displayName),
                     originalSize = sourceSizesFor(item.sourceUri),
                     compressedSize = item.bytesWritten,
+                    sourceWidth = item.sourceWidth,
+                    sourceHeight = item.sourceHeight,
+                    encodedWidth = item.width,
+                    encodedHeight = item.height,
                     width = item.width,
                     height = item.height,
                     quality = item.quality,
@@ -541,7 +545,12 @@ class MainActivity : Activity() {
         }
 
     private fun successDetail(item: ResultItem.Success): String {
-        val dimensions = getString(R.string.result_dimensions, item.width, item.height)
+        val dimensions = ResultsFormatter.formatPixelDimensions(
+            item.sourceWidth,
+            item.sourceHeight,
+            item.encodedWidth,
+            item.encodedHeight,
+        )
         val quality = getString(R.string.result_quality, item.quality)
         val savings = savingsDetail(item)
         return "$dimensions · $quality · $savings"
@@ -680,6 +689,10 @@ class MainActivity : Activity() {
             item.outputName?.let { putString(STATE_OUTPUT_NAME, it) }
             if (item.originalSize != null) putLong(STATE_ORIGINAL_SIZE, item.originalSize)
             putLong(STATE_COMPRESSED_SIZE, item.compressedSize)
+            putInt(STATE_SOURCE_WIDTH, item.sourceWidth)
+            putInt(STATE_SOURCE_HEIGHT, item.sourceHeight)
+            putInt(STATE_ENCODED_WIDTH, item.encodedWidth)
+            putInt(STATE_ENCODED_HEIGHT, item.encodedHeight)
             putInt(STATE_WIDTH, item.width)
             putInt(STATE_HEIGHT, item.height)
             putInt(STATE_QUALITY, item.quality)
@@ -698,6 +711,8 @@ class MainActivity : Activity() {
             STATE_TYPE_SUCCESS -> {
                 val sourceUri = restoreUri(b.getString(STATE_SOURCE_URI)) ?: return null
                 val sourceName = b.getString(STATE_SOURCE_NAME) ?: return null
+                val legacyEncoded = b.getInt(STATE_WIDTH)
+                val legacyDimension = if (legacyEncoded <= 0) 0 else legacyEncoded
                 ResultItem.Success(
                     sourceUri = sourceUri,
                     sourceName = sourceName,
@@ -705,6 +720,10 @@ class MainActivity : Activity() {
                     outputName = b.getString(STATE_OUTPUT_NAME),
                     originalSize = if (b.containsKey(STATE_ORIGINAL_SIZE)) b.getLong(STATE_ORIGINAL_SIZE) else null,
                     compressedSize = b.getLong(STATE_COMPRESSED_SIZE),
+                    sourceWidth = if (b.containsKey(STATE_SOURCE_WIDTH)) b.getInt(STATE_SOURCE_WIDTH) else legacyDimension,
+                    sourceHeight = if (b.containsKey(STATE_SOURCE_HEIGHT)) b.getInt(STATE_SOURCE_HEIGHT) else legacyDimension,
+                    encodedWidth = if (b.containsKey(STATE_ENCODED_WIDTH)) b.getInt(STATE_ENCODED_WIDTH) else legacyDimension,
+                    encodedHeight = if (b.containsKey(STATE_ENCODED_HEIGHT)) b.getInt(STATE_ENCODED_HEIGHT) else legacyDimension,
                     width = b.getInt(STATE_WIDTH),
                     height = b.getInt(STATE_HEIGHT),
                     quality = b.getInt(STATE_QUALITY),
@@ -765,6 +784,10 @@ class MainActivity : Activity() {
         const val STATE_OUTPUT_NAME = "output_name"
         const val STATE_ORIGINAL_SIZE = "original_size"
         const val STATE_COMPRESSED_SIZE = "compressed_size"
+        const val STATE_SOURCE_WIDTH = "source_width"
+        const val STATE_SOURCE_HEIGHT = "source_height"
+        const val STATE_ENCODED_WIDTH = "encoded_width"
+        const val STATE_ENCODED_HEIGHT = "encoded_height"
         const val STATE_WIDTH = "width"
         const val STATE_HEIGHT = "height"
         const val STATE_QUALITY = "quality"
