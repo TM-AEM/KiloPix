@@ -420,10 +420,8 @@ class MainActivity : Activity() {
                     compressedSize = item.bytesWritten,
                     sourceWidth = item.sourceWidth,
                     sourceHeight = item.sourceHeight,
-                    encodedWidth = item.width,
-                    encodedHeight = item.height,
-                    width = item.width,
-                    height = item.height,
+                    encodedWidth = item.encodedWidth,
+                    encodedHeight = item.encodedHeight,
                     quality = item.quality,
                 )
 
@@ -693,8 +691,6 @@ class MainActivity : Activity() {
             putInt(STATE_SOURCE_HEIGHT, item.sourceHeight)
             putInt(STATE_ENCODED_WIDTH, item.encodedWidth)
             putInt(STATE_ENCODED_HEIGHT, item.encodedHeight)
-            putInt(STATE_WIDTH, item.width)
-            putInt(STATE_HEIGHT, item.height)
             putInt(STATE_QUALITY, item.quality)
         }
         is ResultItem.Failure -> Bundle().apply {
@@ -711,8 +707,6 @@ class MainActivity : Activity() {
             STATE_TYPE_SUCCESS -> {
                 val sourceUri = restoreUri(b.getString(STATE_SOURCE_URI)) ?: return null
                 val sourceName = b.getString(STATE_SOURCE_NAME) ?: return null
-                val legacyEncoded = b.getInt(STATE_WIDTH)
-                val legacyDimension = if (legacyEncoded <= 0) 0 else legacyEncoded
                 ResultItem.Success(
                     sourceUri = sourceUri,
                     sourceName = sourceName,
@@ -720,12 +714,10 @@ class MainActivity : Activity() {
                     outputName = b.getString(STATE_OUTPUT_NAME),
                     originalSize = if (b.containsKey(STATE_ORIGINAL_SIZE)) b.getLong(STATE_ORIGINAL_SIZE) else null,
                     compressedSize = b.getLong(STATE_COMPRESSED_SIZE),
-                    sourceWidth = if (b.containsKey(STATE_SOURCE_WIDTH)) b.getInt(STATE_SOURCE_WIDTH) else legacyDimension,
-                    sourceHeight = if (b.containsKey(STATE_SOURCE_HEIGHT)) b.getInt(STATE_SOURCE_HEIGHT) else legacyDimension,
-                    encodedWidth = if (b.containsKey(STATE_ENCODED_WIDTH)) b.getInt(STATE_ENCODED_WIDTH) else legacyDimension,
-                    encodedHeight = if (b.containsKey(STATE_ENCODED_HEIGHT)) b.getInt(STATE_ENCODED_HEIGHT) else legacyDimension,
-                    width = b.getInt(STATE_WIDTH),
-                    height = b.getInt(STATE_HEIGHT),
+                    sourceWidth = b.getInt(STATE_SOURCE_WIDTH),
+                    sourceHeight = b.getInt(STATE_SOURCE_HEIGHT),
+                    encodedWidth = b.getInt(STATE_ENCODED_WIDTH),
+                    encodedHeight = b.getInt(STATE_ENCODED_HEIGHT),
                     quality = b.getInt(STATE_QUALITY),
                 )
             }
@@ -788,8 +780,6 @@ class MainActivity : Activity() {
         const val STATE_SOURCE_HEIGHT = "source_height"
         const val STATE_ENCODED_WIDTH = "encoded_width"
         const val STATE_ENCODED_HEIGHT = "encoded_height"
-        const val STATE_WIDTH = "width"
-        const val STATE_HEIGHT = "height"
         const val STATE_QUALITY = "quality"
         const val STATE_REASON = "reason"
         const val CONTENT_SCHEME = "content"

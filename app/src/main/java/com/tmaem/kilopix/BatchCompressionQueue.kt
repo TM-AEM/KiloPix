@@ -219,8 +219,8 @@ class BatchCompressionQueue(
                         bytesWritten = result.bytesWritten,
                         sourceWidth = source.sourceWidth,
                         sourceHeight = source.sourceHeight,
-                        width = bitmap.width,
-                        height = bitmap.height,
+                        encodedWidth = bitmap.width,
+                        encodedHeight = bitmap.height,
                         quality = result.quality,
                     )
                     is QuickCompressionResult.Failure ->
@@ -240,8 +240,8 @@ class BatchCompressionQueue(
                         bytesWritten = result.bytesWritten,
                         sourceWidth = source.sourceWidth,
                         sourceHeight = source.sourceHeight,
-                        width = bitmap.width,
-                        height = bitmap.height,
+                        encodedWidth = bitmap.width,
+                        encodedHeight = bitmap.height,
                         quality = result.quality,
                     )
                     is TargetSizeCompressionResult.Failure ->
@@ -263,8 +263,8 @@ class BatchCompressionQueue(
                         bytesWritten = result.bytesWritten,
                         sourceWidth = source.sourceWidth,
                         sourceHeight = source.sourceHeight,
-                        width = result.width,
-                        height = result.height,
+                        encodedWidth = result.width,
+                        encodedHeight = result.height,
                         quality = result.quality,
                     )
                     is ManualCompressionResult.Failure ->
@@ -407,9 +407,10 @@ sealed interface BatchCompressionRequest {
 /**
  * Immutable per-item outcome.
  *
- * [Success.width] and [Success.height] are the encoded output pixels (the decoded
- * bitmap for Quick/Target, the requested size for Manual). [Success.sourceWidth]
- * and [Success.sourceHeight] are the original source pixels from the decoder.
+ * [Success.sourceWidth] and [Success.sourceHeight] are the original source pixels from
+ * the decoder. [Success.encodedWidth] and [Success.encodedHeight] are the actual pixels
+ * of the encoded output (the decoded bitmap for Quick/Target, the requested size for
+ * Manual); they may be smaller than the source when decode-time sampling applied.
  */
 sealed interface BatchItemResult {
 
@@ -420,8 +421,8 @@ sealed interface BatchItemResult {
         val bytesWritten: Long,
         val sourceWidth: Int,
         val sourceHeight: Int,
-        val width: Int,
-        val height: Int,
+        val encodedWidth: Int,
+        val encodedHeight: Int,
         val quality: Int,
         /** The final content Uri that was actually written, or null when unavailable. */
         val outputUri: Uri? = null,

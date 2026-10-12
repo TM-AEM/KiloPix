@@ -54,7 +54,6 @@
     <string name="results_title">Results</string>
     <string name="result_saved">Saved</string>
     <string name="result_failed">Failed</string>
-    <string name="result_dimensions">%1$d × %2$d</string>
     <string name="result_quality">Quality %1$d</string>
 
     <string name="savings_unknown">Original size unknown</string>

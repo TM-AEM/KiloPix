@@ -35,9 +35,6 @@ internal sealed interface ResultItem {
         /** Actual pixels of the encoded output (may be downsampled from [sourceWidth]). */
         val encodedWidth: Int,
         val encodedHeight: Int,
-        /** Original encoded width and height kept for backward compatibility. */
-        val width: Int,
-        val height: Int,
         val quality: Int,
     ) : ResultItem
 

@@ -145,8 +145,8 @@ class SaveCoordinator(
                 bytesWritten = finalBytes.size.toLong(),
                 sourceWidth = source.sourceWidth,
                 sourceHeight = source.sourceHeight,
-                width = bitmap.width,
-                height = bitmap.height,
+                encodedWidth = bitmap.width,
+                encodedHeight = bitmap.height,
                 quality = encoded.quality,
                 outputUri = outputUri,
             )
